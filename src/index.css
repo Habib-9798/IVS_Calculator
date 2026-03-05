@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --ivs-accent: #7a1f2b;
+    --ivs-accent-2: #651a23;
+    --ivs-bg: #f6f7fb;
+    --ivs-border: rgba(15, 23, 42, 0.12);
+    --ivs-text: #0f172a;
+    --ivs-muted: rgba(15, 23, 42, 0.62);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial;
+    color: var(--ivs-text);
+    background:
+      radial-gradient(1100px 650px at 12% 8%, rgba(122, 31, 43, 0.10), transparent 60%),
+      radial-gradient(900px 600px at 88% 18%, rgba(17, 24, 39, 0.06), transparent 60%),
+      var(--ivs-bg);
+  }
+
+  ::selection {
+    background: rgba(122, 31, 43, 0.18);
+  }
+}
+
+@layer components {
+  /* Full-width desktop container (slightly tighter side padding) */
+  .ivs-container {
+    @apply w-full px-4;
+  }
+
+  .ivs-card {
+    @apply rounded-2xl border bg-white;
+    border-color: var(--ivs-border);
+    box-shadow: 0 14px 38px rgba(2, 6, 23, 0.07);
+  }
+
+  .ivs-card-muted {
+    @apply rounded-2xl border;
+    border-color: var(--ivs-border);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 14px 38px rgba(2, 6, 23, 0.07);
+  }
+
+  .ivs-subtle {
+    color: var(--ivs-muted);
+  }
+
+  /* Slightly smaller headings (reduces vertical feel) */
+  .ivs-h1 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+
+  .ivs-h2 {
+    @apply text-base font-semibold;
+  }
+
+  /* ✅ Biggest win: make inputs/selects shorter */
+  .ivs-input,
+  .ivs-select {
+    @apply w-full rounded-lg border bg-white px-3 py-1.5 text-[13px] outline-none;
+    border-color: rgba(15, 23, 42, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    line-height: 1.25rem; /* keeps it compact but readable */
+  }
+
+  .ivs-input:focus,
+  .ivs-select:focus {
+    border-color: rgba(122, 31, 43, 0.45);
+    box-shadow: 0 0 0 3px rgba(122, 31, 43, 0.10);
+  }
+
+  /* ✅ Buttons shorter */
+  .ivs-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition;
+  }
+
+  .ivs-btn-primary {
+    background: var(--ivs-accent);
+    color: #fff;
+  }
+
+  .ivs-btn-primary:hover {
+    background: var(--ivs-accent-2);
+  }
+
+  .ivs-btn-ghost {
+    @apply border bg-white;
+    border-color: rgba(15, 23, 42, 0.14);
+  }
+
+  .ivs-btn-ghost:hover {
+    background: rgba(15, 23, 42, 0.04);
+  }
+
+  /* ✅ Pills shorter */
+  .ivs-pill {
+    @apply inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold;
+    border-color: rgba(15, 23, 42, 0.14);
+    background: rgba(255, 255, 255, 0.7);
+  }
+}
