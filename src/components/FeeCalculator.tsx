@@ -26,11 +26,11 @@ interface Student {
   quantity: number;
   additionalPrograms: AdditionalProgram[];
   includeRegistration: boolean;
-  registrationDiscount: number; // percentage
+  registrationDiscount: number;
   exemptFromGlobalDiscounts: boolean;
 }
 
-const REGISTRATION_FEE = 200; // SAR
+const REGISTRATION_FEE = 200;
 
 type Props = {
   settings: AppSettings;
@@ -82,7 +82,6 @@ export default function FeeCalculator({
 
   const [studentCount, setStudentCount] = useState<number>(students.length);
 
-  // ✅ FIX: Only resize students list when dropdown studentCount changes (prevents blink when adding/removing)
   useEffect(() => {
     const target = Math.min(10, Math.max(1, Number(studentCount) || 1));
 
@@ -115,7 +114,6 @@ export default function FeeCalculator({
     });
   }, [studentCount]);
 
-  // ✅ FIX: Keep dropdown in sync when students are added/removed
   useEffect(() => {
     if (studentCount !== students.length) setStudentCount(students.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,6 +165,11 @@ export default function FeeCalculator({
     setStudents(students.filter(s => s.id !== id));
   };
 
+  const isRegularProgram = (programId: string) => {
+    const prog = settings.programs?.find(p => p.id === programId);
+    return prog?.name?.toLowerCase().includes('regular');
+  };
+
   const updateStudent = (id: string, field: keyof Student, value: any) => {
     setStudents(students.map(s => {
       if (s.id === id) {
@@ -175,6 +178,11 @@ export default function FeeCalculator({
           updated.gradeId = '';
           updated.quantity = 1;
           updated.feeType = 'regular';
+
+          if (!isRegularProgram(value)) {
+            updated.includeRegistration = false;
+            updated.registrationDiscount = 50;
+          }
         }
         return updated;
       }
@@ -228,6 +236,11 @@ export default function FeeCalculator({
                 updated.gradeId = '';
                 updated.quantity = 1;
                 updated.feeType = 'regular';
+
+                if (!isRegularProgram(value)) {
+                  updated.includeRegistration = false;
+                  updated.registrationDiscount = 50;
+                }
               }
               return updated;
             }
@@ -279,11 +292,6 @@ export default function FeeCalculator({
   const programDiscountAmount = totalRegularFee - totalActualFee;
 
   const customDiscountAmount = students.reduce((sum, s) => sum + (Number(s.customDiscount) || 0), 0) + apCustomDiscountTotal;
-
-  const isRegularProgram = (programId: string) => {
-    const prog = settings.programs?.find(p => p.id === programId);
-    return prog?.name?.toLowerCase().includes('regular');
-  };
 
   const totalRegistrationFee = students.reduce((sum, s) => {
     let studentReg = 0;
@@ -338,6 +346,7 @@ export default function FeeCalculator({
     const prog = settings.programs?.find(p => p.id === programId);
     return String(prog?.pricingType || 'class').toLowerCase();
   };
+
   const needsQty = (programId: string) => {
     const pt = getPricingType(programId);
     return pt === 'subject' || pt === 'days';
@@ -346,9 +355,11 @@ export default function FeeCalculator({
   const anySubject =
     students.some(s => getPricingType(s.programId) === 'subject') ||
     students.some(s => s.additionalPrograms.some(ap => getPricingType(ap.programId) === 'subject'));
+
   const anyDays =
     students.some(s => getPricingType(s.programId) === 'days') ||
     students.some(s => s.additionalPrograms.some(ap => getPricingType(ap.programId) === 'days'));
+
   const showQtyColumn =
     students.some(s => needsQty(s.programId)) ||
     students.some(s => s.additionalPrograms.some(ap => needsQty(ap.programId)));
@@ -356,10 +367,10 @@ export default function FeeCalculator({
   const qtyHeaderLabel = anySubject && anyDays
     ? 'No. of Subjects / Days'
     : anySubject
-    ? 'No. of Subjects'
-    : anyDays
-    ? 'No. of Days'
-    : '';
+      ? 'No. of Subjects'
+      : anyDays
+        ? 'No. of Days'
+        : '';
 
   const calcFinalFee = (actualFee: number, customDiscount: number, exempt: boolean) => {
     const netFee = Math.max(0, actualFee - (Number(customDiscount) || 0));
@@ -518,7 +529,6 @@ export default function FeeCalculator({
 
   return (
     <div className="w-full space-y-2">
-      {/* Parent & Billing */}
       <div className="ivs-card p-2">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
@@ -587,7 +597,6 @@ export default function FeeCalculator({
         </div>
       </div>
 
-      {/* Students */}
       <div className="ivs-card p-2">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
@@ -595,21 +604,19 @@ export default function FeeCalculator({
             <h2 className="text-sm font-semibold text-slate-900">Students</h2>
           </div>
 
-          {/* ✅ IMPORTANT: type="button" to prevent submit refresh */}
           <button type="button" onClick={addStudent} className="ivs-btn ivs-btn-primary px-3 py-1.5 text-[13px]">
             <Plus className="w-4 h-4" />
             Add Student
           </button>
         </div>
 
-        {/* Table header */}
         <div className="px-1">
           <div
             className="grid gap-2 items-end text-[9px] font-semibold text-slate-500 uppercase tracking-wide"
             style={{
               gridTemplateColumns: showQtyColumn
-                ? "1.1fr 1.2fr 1.1fr 0.7fr 0.85fr 0.8fr 0.8fr 1.25fr 0.7fr 56px"
-                : "1.1fr 1.2fr 1.1fr 0.85fr 0.8fr 0.8fr 1.25fr 0.7fr 56px"
+                ? "1.1fr 1.2fr 1.1fr 0.7fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px"
+                : "1.1fr 1.2fr 1.1fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px"
             }}
           >
             <div>Student</div>
@@ -625,15 +632,14 @@ export default function FeeCalculator({
           </div>
         </div>
 
-        {/* Rows */}
         <div className="mt-1 space-y-1.5">
           {students.map((student, idx) => {
             const selectedProgram = settings.programs?.find(p => p.id === student.programId);
             const regAllowed = isRegularProgram(student.programId);
 
             const cols = showQtyColumn
-              ? "1.1fr 1.2fr 1.1fr 0.7fr 0.85fr 0.8fr 0.8fr 1.25fr 0.7fr 56px"
-              : "1.1fr 1.2fr 1.1fr 0.85fr 0.8fr 0.8fr 1.25fr 0.7fr 56px";
+              ? "1.1fr 1.2fr 1.1fr 0.7fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px"
+              : "1.1fr 1.2fr 1.1fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px";
 
             const mainRegular = getStudentRegularFee(student);
             const mainPayable = calcFinalFee(getStudentActualFee(student), student.customDiscount, student.exemptFromGlobalDiscounts);
@@ -667,7 +673,7 @@ export default function FeeCalculator({
                 </div>
 
                 <div className="px-3 py-1.5 border-b border-slate-100">
-                  <div className="grid gap-2 items-end" style={{ gridTemplateColumns: cols }}>
+                  <div className="grid gap-2 items-center" style={{ gridTemplateColumns: cols }}>
                     <div>
                       <input
                         type="text"
@@ -731,54 +737,50 @@ export default function FeeCalculator({
                       />
                     </div>
 
-                    <div className="pb-0.5 font-semibold text-slate-900 text-sm">{formatV(mainRegular)}</div>
-                    <div className="pb-0.5 font-semibold text-[#7a1f2b] text-sm">{formatV(mainPayable)}</div>
+                    <div className="font-semibold text-slate-900 text-sm">{formatV(mainRegular)}</div>
+                    <div className="font-semibold text-[#7a1f2b] text-sm">{formatV(mainPayable)}</div>
 
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-semibold text-slate-600">On</span>
-                        <label className={`relative inline-flex items-center ${regAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
-                          <input
-                            type="checkbox"
-                            checked={student.includeRegistration}
-                            onChange={(e) => updateStudent(student.id, 'includeRegistration', e.target.checked)}
-                            className="sr-only peer"
-                            disabled={!regAllowed}
-                          />
-                          <div className="w-10 h-5 bg-slate-300 peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#7a1f2b]"></div>
-                        </label>
-                      </div>
+                      {regAllowed ? (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={student.includeRegistration}
+                              onChange={(e) => updateStudent(student.id, 'includeRegistration', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                          </label>
 
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={student.registrationDiscount || 0}
-                          onChange={(e) => updateStudent(student.id, 'registrationDiscount', Number(e.target.value))}
-                          className="ivs-input py-1.5 px-2"
-                          disabled={!regAllowed}
-                        />
-                        <div className="text-[11px] font-semibold text-slate-700 flex items-center">
-                          {student.includeRegistration && regAllowed ? formatV(mainRegNet) : formatV(0)}
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={student.registrationDiscount || 0}
+                            onChange={(e) => updateStudent(student.id, 'registrationDiscount', Number(e.target.value))}
+                            className="ivs-input h-8 py-1 px-2 w-16"
+                          />
+
+                          <div className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+                            {student.includeRegistration ? formatV(mainRegNet) : formatV(0)}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-400">—</div>
+                      )}
                     </div>
 
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-semibold text-slate-600">On</span>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={student.exemptFromGlobalDiscounts}
-                            onChange={(e) => updateStudent(student.id, 'exemptFromGlobalDiscounts', e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-10 h-5 bg-slate-300 peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#7a1f2b]"></div>
-                        </label>
-                      </div>
-                      <div className="text-[10px] ivs-subtle mt-0.5">Global</div>
+                    <div className="flex items-center justify-center">
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={student.exemptFromGlobalDiscounts}
+                          onChange={(e) => updateStudent(student.id, 'exemptFromGlobalDiscounts', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                      </label>
                     </div>
 
                     <div className="flex items-center justify-center">
@@ -799,7 +801,7 @@ export default function FeeCalculator({
 
                       return (
                         <div key={ap.id} className="pt-1.5">
-                          <div className="grid gap-2 items-end" style={{ gridTemplateColumns: cols }}>
+                          <div className="grid gap-2 items-center" style={{ gridTemplateColumns: cols }}>
                             <div>
                               <input type="text" value={student.name} disabled className="ivs-input py-1.5 px-2 bg-slate-50" />
                             </div>
@@ -857,54 +859,50 @@ export default function FeeCalculator({
                               />
                             </div>
 
-                            <div className="pb-0.5 font-semibold text-slate-900 text-sm">{formatV(apRegular)}</div>
-                            <div className="pb-0.5 font-semibold text-[#7a1f2b] text-sm">{formatV(apPayable)}</div>
+                            <div className="font-semibold text-slate-900 text-sm">{formatV(apRegular)}</div>
+                            <div className="font-semibold text-[#7a1f2b] text-sm">{formatV(apPayable)}</div>
 
                             <div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-semibold text-slate-600">On</span>
-                                <label className={`relative inline-flex items-center ${apRegAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={ap.includeRegistration}
-                                    onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'includeRegistration', e.target.checked)}
-                                    className="sr-only peer"
-                                    disabled={!apRegAllowed}
-                                  />
-                                  <div className="w-10 h-5 bg-slate-300 peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#7a1f2b]"></div>
-                                </label>
-                              </div>
+                              {apRegAllowed ? (
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                    <input
+                                      type="checkbox"
+                                      checked={ap.includeRegistration}
+                                      onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'includeRegistration', e.target.checked)}
+                                      className="sr-only peer"
+                                    />
+                                    <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                                  </label>
 
-                              <div className="grid grid-cols-2 gap-2 mt-1">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={ap.registrationDiscount || 0}
-                                  onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'registrationDiscount', Number(e.target.value))}
-                                  className="ivs-input py-1.5 px-2"
-                                  disabled={!apRegAllowed}
-                                />
-                                <div className="text-[11px] font-semibold text-slate-700 flex items-center">
-                                  {ap.includeRegistration && apRegAllowed ? formatV(apRegNet) : formatV(0)}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={ap.registrationDiscount || 0}
+                                    onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'registrationDiscount', Number(e.target.value))}
+                                    className="ivs-input h-8 py-1 px-2 w-16"
+                                  />
+
+                                  <div className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+                                    {ap.includeRegistration ? formatV(apRegNet) : formatV(0)}
+                                  </div>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="text-[11px] text-slate-400">—</div>
+                              )}
                             </div>
 
-                            <div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-semibold text-slate-600">On</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={ap.exemptFromGlobalDiscounts}
-                                    onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'exemptFromGlobalDiscounts', e.target.checked)}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-10 h-5 bg-slate-300 peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#7a1f2b]"></div>
-                                </label>
-                              </div>
-                              <div className="text-[10px] ivs-subtle mt-0.5">Global</div>
+                            <div className="flex items-center justify-center">
+                              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input
+                                  type="checkbox"
+                                  checked={ap.exemptFromGlobalDiscounts}
+                                  onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'exemptFromGlobalDiscounts', e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                              </label>
                             </div>
 
                             <div className="flex items-center justify-center">
@@ -929,7 +927,6 @@ export default function FeeCalculator({
         </div>
       </div>
 
-      {/* Final Summary (compact) */}
       <div className="ivs-card p-2">
         <div className="flex items-center justify-between gap-2">
           <div>
@@ -937,7 +934,6 @@ export default function FeeCalculator({
             <div className="text-[10px] ivs-subtle mt-0.5">Each student payable + overall totals</div>
           </div>
 
-          {/* ✅ IMPORTANT: type="button" to prevent submit refresh */}
           <button
             type="button"
             onClick={handleGenerateInvoice}
