@@ -16,9 +16,19 @@ import {
   Settings,
   ShieldAlert,
   Users,
+  Lock,
+  LogOut,
 } from "lucide-react";
 
 export default function App() {
+  const APP_PASSWORD = "IqraOffice2026!";
+
+  const [enteredPassword, setEnteredPassword] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem("iqra_auth") === "true";
+  });
+  const [loginError, setLoginError] = useState("");
+
   const [activeTab, setActiveTab] = useState<"calculator" | "settings">("calculator");
 
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -33,7 +43,6 @@ export default function App() {
     return DEFAULT_SETTINGS;
   });
 
-  // ✅ Discounts (shown in header)
   const [siblingDiscount, setSiblingDiscount] = useState<number>(0);
   const [multiProgramDiscount, setMultiProgramDiscount] = useState<number>(0);
   const [fixedDiscount, setFixedDiscount] = useState<number>(0);
@@ -94,12 +103,74 @@ export default function App() {
     }
   };
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (enteredPassword === APP_PASSWORD) {
+      sessionStorage.setItem("iqra_auth", "true");
+      setIsAuthenticated(true);
+      setLoginError("");
+      setEnteredPassword("");
+    } else {
+      setLoginError("Incorrect password. Please try again.");
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("iqra_auth");
+    setIsAuthenticated(false);
+    setEnteredPassword("");
+    setLoginError("");
+  };
+
   const [hasError, setHasError] = useState(false);
   useEffect(() => {
     const handleError = () => setHasError(true);
     window.addEventListener("error", handleError);
     return () => window.removeEventListener("error", handleError);
   }, []);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+          <div className="flex justify-center mb-5">
+            <div className="w-14 h-14 rounded-full bg-[#7a1f2b]/10 flex items-center justify-center">
+              <Lock className="w-7 h-7 text-[#7a1f2b]" />
+            </div>
+          </div>
+
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-slate-800">Restricted Access</h1>
+            <p className="text-slate-500 mt-2">
+              Enter the organization password to open the calculator.
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={enteredPassword}
+                onChange={(e) => setEnteredPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full border border-slate-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#7a1f2b]"
+              />
+            </div>
+
+            {loginError && <p className="text-sm text-red-600">{loginError}</p>}
+
+            <button
+              type="submit"
+              className="w-full bg-[#7a1f2b] hover:bg-[#651923] text-white font-semibold py-3 rounded-xl transition-all"
+            >
+              Login
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (hasError) {
     return (
@@ -127,11 +198,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* ✅ HEADER */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="w-full px-6">
           <div className="h-16 flex items-center justify-between gap-4">
-            {/* Left: Logo + Name */}
             <div className="flex items-center gap-3 min-w-[320px]">
               {settings.logoBase64 ? (
                 <img
@@ -153,7 +222,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Middle: Discounts (with labels) */}
             <div className="flex-1 flex items-center justify-center">
               {activeTab === "calculator" && (
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-sm">
@@ -199,8 +267,15 @@ export default function App() {
               )}
             </div>
 
-            {/* Right: Tabs near currency + Currency */}
             <div className="flex items-center gap-3 min-w-[520px] justify-end">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+
               <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-sm">
                 <button
                   onClick={() => setActiveTab("calculator")}
@@ -263,7 +338,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Body full width */}
       <div className="pt-6 px-6 w-full">
         {activeTab === "calculator" ? (
           <FeeCalculator
