@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, FileText, GraduationCap, User, BookPlus } from 'lucide-react';
+import { Plus, Trash2, FileText, GraduationCap, User, BookPlus, ChevronDown, Check } from 'lucide-react';
 import { generateInvoicePDF } from './InvoiceGenerator';
 import { format } from 'date-fns';
 import { AppSettings } from '../types';
@@ -11,7 +11,6 @@ interface AdditionalProgram {
   feeType: 'regular' | 'discounted';
   customDiscount: number;
   quantity: number;
-  exemptFromGlobalDiscounts: boolean;
   includeRegistration: boolean;
   registrationDiscount: number;
 }
@@ -27,36 +26,19 @@ interface Student {
   additionalPrograms: AdditionalProgram[];
   includeRegistration: boolean;
   registrationDiscount: number;
-  exemptFromGlobalDiscounts: boolean;
 }
-
-const REGISTRATION_FEE = 200;
 
 type Props = {
   settings: AppSettings;
-
-  siblingDiscount: number;
-  setSiblingDiscount: (v: number) => void;
-
-  multiProgramDiscount: number;
-  setMultiProgramDiscount: (v: number) => void;
-
-  fixedDiscount: number;
-  setFixedDiscount: (v: number) => void;
 };
 
-export default function FeeCalculator({
-  settings,
-  siblingDiscount,
-  setSiblingDiscount,
-  multiProgramDiscount,
-  setMultiProgramDiscount,
-  fixedDiscount,
-  setFixedDiscount
-}: Props) {
+export default function FeeCalculator({ settings }: Props) {
   const currentRate = settings.exchangeRates[settings.selectedCurrency] || 1;
   const convert = (amount: number) => amount * currentRate;
   const formatV = (amount: number) => `${settings.selectedCurrency} ${convert(amount).toFixed(2)}`;
+
+  const currentYear = new Date().getFullYear();
+  const monthOptions = Array.from({ length: 12 }, (_, i) => format(new Date(currentYear, i, 1), 'MMMM yyyy'));
 
   const [parentName, setParentName] = useState('');
   const [fCode, setFCode] = useState('');
@@ -72,13 +54,20 @@ export default function FeeCalculator({
       quantity: 1,
       additionalPrograms: [],
       includeRegistration: false,
-      registrationDiscount: 50,
-      exemptFromGlobalDiscounts: false
+      registrationDiscount: 50
     }
   ]);
 
-  const [month, setMonth] = useState(format(new Date(), 'MMMM yyyy'));
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([format(new Date(), 'MMMM yyyy')]);
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const [dueDate, setDueDate] = useState(format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+
+  const monthMultiplier = Math.max(1, selectedMonths.length);
+  const billingMonthLabel = selectedMonths.length > 0 ? selectedMonths.join(', ') : format(new Date(), 'MMMM yyyy');
+  const billingMonthShortLabel =
+    selectedMonths.length === 1
+      ? selectedMonths[0]
+      : `${selectedMonths.length} month(s) selected`;
 
   const [studentCount, setStudentCount] = useState<number>(students.length);
 
@@ -103,8 +92,7 @@ export default function FeeCalculator({
             quantity: 1,
             additionalPrograms: [],
             includeRegistration: false,
-            registrationDiscount: 50,
-            exemptFromGlobalDiscounts: false
+            registrationDiscount: 50
           });
         }
         return next;
@@ -119,28 +107,27 @@ export default function FeeCalculator({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [students.length]);
 
-  useEffect(() => {
-    const count = students.length;
-    let pct = 0;
-    if (count === 2) pct = 10;
-    else if (count === 3) pct = 15;
-    else if (count === 4) pct = 20;
-    else if (count >= 5) pct = 25 + (count - 5) * 5;
+  const cleanPercentage = (value: number) => {
+    return Math.min(100, Math.max(0, Number(value) || 0));
+  };
 
-    if (pct !== siblingDiscount) setSiblingDiscount(pct);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students.length]);
+  const toggleMonth = (monthName: string) => {
+    setSelectedMonths(prev => {
+      if (prev.includes(monthName)) {
+        const next = prev.filter(m => m !== monthName);
+        return next.length > 0 ? next : [monthName];
+      }
+      return [...prev, monthName];
+    });
+  };
 
-  useEffect(() => {
-    const studentsWithAP = students.filter(s => s.additionalPrograms.length > 0).length;
-    let pct = 0;
-    if (studentsWithAP === 1) pct = 5;
-    else if (studentsWithAP === 2) pct = 10;
-    else if (studentsWithAP >= 3) pct = 15;
+  const selectFullYear = () => {
+    setSelectedMonths(monthOptions);
+  };
 
-    if (pct !== multiProgramDiscount) setMultiProgramDiscount(pct);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students]);
+  const selectCurrentMonthOnly = () => {
+    setSelectedMonths([format(new Date(), 'MMMM yyyy')]);
+  };
 
   const addStudent = () => {
     setStudents([
@@ -155,8 +142,7 @@ export default function FeeCalculator({
         quantity: 1,
         additionalPrograms: [],
         includeRegistration: false,
-        registrationDiscount: 50,
-        exemptFromGlobalDiscounts: false
+        registrationDiscount: 50
       }
     ]);
   };
@@ -168,6 +154,11 @@ export default function FeeCalculator({
   const isRegularProgram = (programId: string) => {
     const prog = settings.programs?.find(p => p.id === programId);
     return prog?.name?.toLowerCase().includes('regular');
+  };
+
+  const getGrade = (programId: string, gradeId: string) => {
+    const program = settings.programs?.find(p => p.id === programId);
+    return program?.grades.find(g => g.id === gradeId);
   };
 
   const updateStudent = (id: string, field: keyof Student, value: any) => {
@@ -204,7 +195,6 @@ export default function FeeCalculator({
               feeType: 'regular',
               customDiscount: 0,
               quantity: 1,
-              exemptFromGlobalDiscounts: false,
               includeRegistration: false,
               registrationDiscount: 50
             }
@@ -253,92 +243,78 @@ export default function FeeCalculator({
   };
 
   const getStudentRegularFee = (student: Student) => {
-    const program = settings.programs?.find(p => p.id === student.programId);
-    const grade = program?.grades.find(g => g.id === student.gradeId);
+    const grade = getGrade(student.programId, student.gradeId);
     if (!grade) return 0;
     return grade.fee * (student.quantity || 1);
   };
 
   const getStudentActualFee = (student: Student) => {
-    const program = settings.programs?.find(p => p.id === student.programId);
-    const grade = program?.grades.find(g => g.id === student.gradeId);
+    const grade = getGrade(student.programId, student.gradeId);
     if (!grade) return 0;
     const baseFee = student.feeType === 'discounted' ? grade.discountedFee : grade.fee;
     return baseFee * (student.quantity || 1);
   };
 
   const getAPRegularFee = (ap: AdditionalProgram) => {
-    const program = settings.programs?.find(p => p.id === ap.programId);
-    const grade = program?.grades.find(g => g.id === ap.gradeId);
+    const grade = getGrade(ap.programId, ap.gradeId);
     if (!grade) return 0;
     return grade.fee * (ap.quantity || 1);
   };
 
   const getAPActualFee = (ap: AdditionalProgram) => {
-    const program = settings.programs?.find(p => p.id === ap.programId);
-    const grade = program?.grades.find(g => g.id === ap.gradeId);
+    const grade = getGrade(ap.programId, ap.gradeId);
     if (!grade) return 0;
     const baseFee = ap.feeType === 'discounted' ? grade.discountedFee : grade.fee;
     return baseFee * (ap.quantity || 1);
   };
 
+  const getRegistrationFullFee = (programId: string, gradeId: string) => {
+    if (!isRegularProgram(programId)) return 0;
+    const grade = getGrade(programId, gradeId);
+    return Number((grade as any)?.registrationFee) || 0;
+  };
+
+  const getRegistrationNetFee = (programId: string, gradeId: string, discountPct: number) => {
+    if (!isRegularProgram(programId)) return 0;
+    const fullFee = getRegistrationFullFee(programId, gradeId);
+    const safeDiscount = cleanPercentage(discountPct);
+    return Math.max(0, fullFee - (fullFee * safeDiscount / 100));
+  };
+
   const allAPList = students.flatMap(s => s.additionalPrograms);
-  const apRegularTotal = allAPList.reduce((sum, ap) => sum + getAPRegularFee(ap), 0);
-  const apActualTotal = allAPList.reduce((sum, ap) => sum + getAPActualFee(ap), 0);
-  const apCustomDiscountTotal = allAPList.reduce((sum, ap) => sum + (Number(ap.customDiscount) || 0), 0);
 
-  const totalRegularFee = students.reduce((sum, s) => sum + getStudentRegularFee(s), 0) + apRegularTotal;
-  const totalActualFee = students.reduce((sum, s) => sum + getStudentActualFee(s), 0) + apActualTotal;
-  const programDiscountAmount = totalRegularFee - totalActualFee;
+  const monthlyAPRegularTotal = allAPList.reduce((sum, ap) => sum + getAPRegularFee(ap), 0);
+  const monthlyAPActualTotal = allAPList.reduce((sum, ap) => sum + getAPActualFee(ap), 0);
+  const monthlyAPCustomDiscountTotal = allAPList.reduce((sum, ap) => sum + (Number(ap.customDiscount) || 0), 0);
 
-  const customDiscountAmount = students.reduce((sum, s) => sum + (Number(s.customDiscount) || 0), 0) + apCustomDiscountTotal;
+  const monthlyRegularFee = students.reduce((sum, s) => sum + getStudentRegularFee(s), 0) + monthlyAPRegularTotal;
+  const monthlyActualFee = students.reduce((sum, s) => sum + getStudentActualFee(s), 0) + monthlyAPActualTotal;
+  const monthlyProgramDiscountAmount = monthlyRegularFee - monthlyActualFee;
+  const monthlyCustomDiscountAmount = students.reduce((sum, s) => sum + (Number(s.customDiscount) || 0), 0) + monthlyAPCustomDiscountTotal;
+
+  const totalRegularFee = monthlyRegularFee * monthMultiplier;
+  const programDiscountAmount = monthlyProgramDiscountAmount * monthMultiplier;
+  const customDiscountAmount = monthlyCustomDiscountAmount * monthMultiplier;
 
   const totalRegistrationFee = students.reduce((sum, s) => {
     let studentReg = 0;
+
     if (s.includeRegistration && isRegularProgram(s.programId)) {
-      studentReg += REGISTRATION_FEE - (REGISTRATION_FEE * (s.registrationDiscount / 100));
+      studentReg += getRegistrationNetFee(s.programId, s.gradeId, s.registrationDiscount);
     }
+
     s.additionalPrograms.forEach(ap => {
       if (ap.includeRegistration && isRegularProgram(ap.programId)) {
-        studentReg += REGISTRATION_FEE - (REGISTRATION_FEE * (ap.registrationDiscount / 100));
+        studentReg += getRegistrationNetFee(ap.programId, ap.gradeId, ap.registrationDiscount);
       }
     });
+
     return sum + studentReg;
   }, 0);
 
-  const feeAfterStudentDiscounts = Math.max(0, totalRegularFee - programDiscountAmount - customDiscountAmount);
-
-  const eligibleFee = (() => {
-    let total = 0;
-    students.forEach(s => {
-      if (!s.exemptFromGlobalDiscounts) {
-        const regFee = getStudentRegularFee(s);
-        const actFee = getStudentActualFee(s);
-        const cDisc = Number(s.customDiscount) || 0;
-        total += Math.max(0, regFee - (regFee - actFee) - cDisc);
-      }
-      s.additionalPrograms.forEach(ap => {
-        if (!ap.exemptFromGlobalDiscounts) {
-          const apReg = getAPRegularFee(ap);
-          const apAct = getAPActualFee(ap);
-          const apCDisc = Number(ap.customDiscount) || 0;
-          total += Math.max(0, apReg - (apReg - apAct) - apCDisc);
-        }
-      });
-    });
-    return total;
-  })();
-
-  const siblingDiscountAmount = eligibleFee * (siblingDiscount / 100);
-  const multiProgramDiscountAmount = eligibleFee * (multiProgramDiscount / 100);
-  const eligibleFixedDiscount = feeAfterStudentDiscounts > 0 ? (eligibleFee / feeAfterStudentDiscounts) * fixedDiscount : fixedDiscount;
-
   const totalDiscounts =
     programDiscountAmount +
-    customDiscountAmount +
-    siblingDiscountAmount +
-    multiProgramDiscountAmount +
-    eligibleFixedDiscount;
+    customDiscountAmount;
 
   const finalTotal = Math.max(0, totalRegularFee - totalDiscounts) + totalRegistrationFee;
 
@@ -372,53 +348,106 @@ export default function FeeCalculator({
         ? 'No. of Days'
         : '';
 
-  const calcFinalFee = (actualFee: number, customDiscount: number, exempt: boolean) => {
-    const netFee = Math.max(0, actualFee - (Number(customDiscount) || 0));
-    const sibCut = exempt ? 0 : netFee * (siblingDiscount / 100);
-    const multiCut = exempt ? 0 : netFee * (multiProgramDiscount / 100);
-    const fixedShare = exempt ? 0 : (feeAfterStudentDiscounts > 0 ? (netFee / feeAfterStudentDiscounts) * fixedDiscount : 0);
-    return Math.max(0, netFee - sibCut - multiCut - fixedShare);
+  const studentGridColumns = showQtyColumn
+    ? "1.05fr 1.15fr 1.05fr 0.65fr 0.75fr 0.75fr 0.75fr 2.05fr 56px"
+    : "1.05fr 1.15fr 1.05fr 0.75fr 0.75fr 0.75fr 2.05fr 56px";
+
+  const calcFinalFee = (actualFee: number, customDiscount: number) => {
+    return Math.max(0, actualFee - (Number(customDiscount) || 0));
   };
 
-  const regNet = (include: boolean, discountPct: number, programId: string) => {
+  const regNet = (include: boolean, programId: string, gradeId: string, discountPct: number) => {
     if (!include) return 0;
-    if (!isRegularProgram(programId)) return 0;
-    return REGISTRATION_FEE - (REGISTRATION_FEE * (Number(discountPct) || 0) / 100);
+    return getRegistrationNetFee(programId, gradeId, discountPct);
   };
 
-  const regFull = (include: boolean, programId: string) => {
+  const regFull = (include: boolean, programId: string, gradeId: string) => {
     if (!include) return 0;
-    if (!isRegularProgram(programId)) return 0;
-    return REGISTRATION_FEE;
+    return getRegistrationFullFee(programId, gradeId);
+  };
+
+  const renderRegistrationBox = (
+    allowed: boolean,
+    checked: boolean,
+    discountValue: number,
+    payableAmount: number,
+    onToggle: (value: boolean) => void,
+    onDiscountChange: (value: number) => void
+  ) => {
+    const safeDiscount = cleanPercentage(discountValue ?? 50);
+
+    return (
+      <div className="w-full min-w-[260px] flex items-center gap-2">
+        <label
+          className={`relative inline-flex items-center shrink-0 ${
+            allowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+          }`}
+          title={allowed ? 'Include registration fee' : 'Registration is only available for regular programs'}
+        >
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={!allowed}
+            onChange={(e) => onToggle(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+        </label>
+
+        <div className={`flex items-center gap-1 shrink-0 ${allowed ? '' : 'opacity-50'}`}>
+          <span className="text-[10px] font-semibold text-slate-500 whitespace-nowrap">
+            Disc
+          </span>
+
+          <div className="relative w-[72px] shrink-0">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={safeDiscount}
+              disabled={!allowed}
+              onChange={(e) => onDiscountChange(cleanPercentage(Number(e.target.value)))}
+              className="ivs-input h-8 py-1 pl-2 pr-6 w-full text-[12px] font-bold bg-white text-slate-900 border-slate-300"
+              title="Registration fee discount percentage"
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-500 pointer-events-none">
+              %
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-[88px] text-[11px] font-bold text-[#7a1f2b] whitespace-nowrap">
+          {checked && allowed ? formatV(payableAmount) : formatV(0)}
+        </div>
+      </div>
+    );
   };
 
   const handleGenerateInvoice = async () => {
-    if (!parentName) {
-      alert('Please enter Parent Name');
-      return;
-    }
-
     const invoiceData = {
-      parentName,
+      parentName: parentName || 'Parent',
       fCode,
       issuedOn: format(new Date(), 'dd MMM yyyy'),
       dueDate: format(new Date(dueDate), 'dd MMM yyyy'),
+      monthCount: monthMultiplier,
+      selectedMonths,
+      billingMonths: selectedMonths,
       students: [
         ...students.map(s => {
           const program = settings.programs?.find(p => p.id === s.programId);
-          const grade = program?.grades.find(g => g.id === s.gradeId);
-          const regularFee = getStudentRegularFee(s);
-          const discountedFee = getStudentActualFee(s);
-          const customDisc = Number(s.customDiscount) || 0;
-          const netFee = Math.max(0, discountedFee - customDisc);
-          const sibCut = s.exemptFromGlobalDiscounts ? 0 : netFee * (siblingDiscount / 100);
-          const multiCut = s.exemptFromGlobalDiscounts ? 0 : netFee * (multiProgramDiscount / 100);
-          const fixedShare = s.exemptFromGlobalDiscounts ? 0 : (feeAfterStudentDiscounts > 0 ? (netFee / feeAfterStudentDiscounts) * fixedDiscount : 0);
-          const finalFee = Math.max(0, netFee - sibCut - multiCut - fixedShare);
+          const grade = getGrade(s.programId, s.gradeId);
+          const regularFee = getStudentRegularFee(s) * monthMultiplier;
+          const discountedFee = getStudentActualFee(s) * monthMultiplier;
+          const customDisc = (Number(s.customDiscount) || 0) * monthMultiplier;
+          const finalFee = Math.max(0, discountedFee - customDisc);
+
           return {
             name: s.name || 'Student',
             grade: grade ? `${program?.name} - ${grade.name}` : '',
-            month: month,
+            month: billingMonthLabel,
+            months: selectedMonths,
+            monthCount: monthMultiplier,
             amount: regularFee,
             regularFee: regularFee,
             discountedFee: discountedFee,
@@ -430,19 +459,18 @@ export default function FeeCalculator({
         ...students.flatMap(s =>
           s.additionalPrograms.map(ap => {
             const program = settings.programs?.find(p => p.id === ap.programId);
-            const grade = program?.grades.find(g => g.id === ap.gradeId);
-            const regularFee = getAPRegularFee(ap);
-            const discountedFee = getAPActualFee(ap);
-            const customDisc = Number(ap.customDiscount) || 0;
-            const netFee = Math.max(0, discountedFee - customDisc);
-            const sibCut = ap.exemptFromGlobalDiscounts ? 0 : netFee * (siblingDiscount / 100);
-            const multiCut = ap.exemptFromGlobalDiscounts ? 0 : netFee * (multiProgramDiscount / 100);
-            const fixedShare = ap.exemptFromGlobalDiscounts ? 0 : (feeAfterStudentDiscounts > 0 ? (netFee / feeAfterStudentDiscounts) * fixedDiscount : 0);
-            const finalFee = Math.max(0, netFee - sibCut - multiCut - fixedShare);
+            const grade = getGrade(ap.programId, ap.gradeId);
+            const regularFee = getAPRegularFee(ap) * monthMultiplier;
+            const discountedFee = getAPActualFee(ap) * monthMultiplier;
+            const customDisc = (Number(ap.customDiscount) || 0) * monthMultiplier;
+            const finalFee = Math.max(0, discountedFee - customDisc);
+
             return {
               name: s.name || 'Student',
               grade: grade ? `${program?.name} - ${grade.name}` : '',
-              month: month,
+              month: billingMonthLabel,
+              months: selectedMonths,
+              monthCount: monthMultiplier,
               amount: regularFee,
               regularFee: regularFee,
               discountedFee: discountedFee,
@@ -455,32 +483,43 @@ export default function FeeCalculator({
       ].filter(s => s.regularFee > 0),
       registrationEntries: students.flatMap(s => {
         const entries: any[] = [];
+
         if (s.includeRegistration && isRegularProgram(s.programId)) {
+          const fullFee = getRegistrationFullFee(s.programId, s.gradeId);
+          const netFee = getRegistrationNetFee(s.programId, s.gradeId, s.registrationDiscount);
+
           entries.push({
             name: s.name || 'Student',
-            fullFee: REGISTRATION_FEE,
-            discount: s.registrationDiscount,
-            netFee: REGISTRATION_FEE - (REGISTRATION_FEE * s.registrationDiscount / 100)
+            fullFee,
+            discount: Math.max(0, fullFee - netFee),
+            discountPercent: cleanPercentage(s.registrationDiscount),
+            netFee
           });
         }
+
         s.additionalPrograms.forEach(ap => {
           if (ap.includeRegistration && isRegularProgram(ap.programId)) {
             const apProgram = settings.programs?.find(p => p.id === ap.programId);
+            const fullFee = getRegistrationFullFee(ap.programId, ap.gradeId);
+            const netFee = getRegistrationNetFee(ap.programId, ap.gradeId, ap.registrationDiscount);
+
             entries.push({
               name: `${s.name || 'Student'} (${apProgram?.name || 'Add-on'})`,
-              fullFee: REGISTRATION_FEE,
-              discount: ap.registrationDiscount,
-              netFee: REGISTRATION_FEE - (REGISTRATION_FEE * ap.registrationDiscount / 100)
+              fullFee,
+              discount: Math.max(0, fullFee - netFee),
+              discountPercent: cleanPercentage(ap.registrationDiscount),
+              netFee
             });
           }
         });
+
         return entries;
       }),
       totalAmount: totalRegularFee + totalRegistrationFee,
       programDiscountAmount,
       customDiscountAmount,
-      enrollmentDiscountAmount: siblingDiscountAmount + multiProgramDiscountAmount,
-      fixedDiscountAmount: eligibleFixedDiscount,
+      enrollmentDiscountAmount: 0,
+      fixedDiscountAmount: 0,
       finalAmount: finalTotal,
       settings,
       currency: settings.selectedCurrency,
@@ -491,24 +530,24 @@ export default function FeeCalculator({
   };
 
   const studentTotals = students.map((s, idx) => {
-    const mainRegular = getStudentRegularFee(s);
-    const apRegular = s.additionalPrograms.reduce((sum, ap) => sum + getAPRegularFee(ap), 0);
+    const mainRegular = getStudentRegularFee(s) * monthMultiplier;
+    const apRegular = s.additionalPrograms.reduce((sum, ap) => sum + (getAPRegularFee(ap) * monthMultiplier), 0);
 
     const regFullTotal =
-      regFull(s.includeRegistration, s.programId) +
-      s.additionalPrograms.reduce((sum, ap) => sum + regFull(ap.includeRegistration, ap.programId), 0);
+      regFull(s.includeRegistration, s.programId, s.gradeId) +
+      s.additionalPrograms.reduce((sum, ap) => sum + regFull(ap.includeRegistration, ap.programId, ap.gradeId), 0);
 
     const regularTotal = mainRegular + apRegular + regFullTotal;
 
-    const mainPayable = calcFinalFee(getStudentActualFee(s), s.customDiscount, s.exemptFromGlobalDiscounts);
+    const mainPayable = calcFinalFee(getStudentActualFee(s), s.customDiscount) * monthMultiplier;
     const apPayable = s.additionalPrograms.reduce(
-      (sum, ap) => sum + calcFinalFee(getAPActualFee(ap), ap.customDiscount, ap.exemptFromGlobalDiscounts),
+      (sum, ap) => sum + (calcFinalFee(getAPActualFee(ap), ap.customDiscount) * monthMultiplier),
       0
     );
 
     const regNetTotal =
-      regNet(s.includeRegistration, s.registrationDiscount, s.programId) +
-      s.additionalPrograms.reduce((sum, ap) => sum + regNet(ap.includeRegistration, ap.registrationDiscount, ap.programId), 0);
+      regNet(s.includeRegistration, s.programId, s.gradeId, s.registrationDiscount) +
+      s.additionalPrograms.reduce((sum, ap) => sum + regNet(ap.includeRegistration, ap.programId, ap.gradeId, ap.registrationDiscount), 0);
 
     const payableTotal = mainPayable + apPayable + regNetTotal;
 
@@ -537,7 +576,7 @@ export default function FeeCalculator({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="ivs-pill py-0.5">
-              <span className="ivs-subtle">Billing</span> <span className="font-semibold text-slate-900">{month}</span>
+              <span className="ivs-subtle">Billing</span> <span className="font-semibold text-slate-900">{selectedMonths.length} month(s)</span>
             </span>
             <span className="ivs-pill py-0.5">
               <span className="ivs-subtle">Due</span> <span className="font-semibold text-slate-900">{dueDate}</span>
@@ -553,7 +592,7 @@ export default function FeeCalculator({
               value={parentName}
               onChange={(e) => setParentName(e.target.value)}
               className="ivs-input py-1.5 px-2"
-              placeholder="Enter parent name"
+              placeholder="Optional"
             />
           </div>
           <div>
@@ -576,15 +615,86 @@ export default function FeeCalculator({
               {Array.from({ length: 10 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
-          <div>
+
+          <div className="relative">
             <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Billing Month</label>
-            <input
-              type="text"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="ivs-input py-1.5 px-2"
-            />
+            <button
+              type="button"
+              onClick={() => setIsMonthDropdownOpen(prev => !prev)}
+              className="ivs-input py-1.5 px-2 w-full flex items-center justify-between text-left"
+            >
+              <span className="truncate">{billingMonthShortLabel}</span>
+              <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+            </button>
+
+            {isMonthDropdownOpen && (
+              <div className="absolute z-30 mt-1 w-[360px] right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-2">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-800">Select Billing Months</div>
+                    <div className="text-[10px] text-slate-500">{selectedMonths.length} month(s) selected</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={selectCurrentMonthOnly}
+                      className="ivs-btn ivs-btn-ghost px-2 py-1 text-[11px]"
+                    >
+                      Current
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectFullYear}
+                      className="ivs-btn ivs-btn-primary px-2 py-1 text-[11px]"
+                    >
+                      Full Year
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  {monthOptions.map(monthName => {
+                    const checked = selectedMonths.includes(monthName);
+
+                    return (
+                      <label
+                        key={monthName}
+                        className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border text-[12px] font-semibold cursor-pointer ${
+                          checked
+                            ? 'bg-[#7a1f2b] border-[#7a1f2b] text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>{monthName.replace(` ${currentYear}`, '')}</span>
+                        <span className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          checked ? 'border-white bg-white text-[#7a1f2b]' : 'border-slate-300 bg-white'
+                        }`}>
+                          {checked && <Check className="w-3 h-3" />}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleMonth(monthName)}
+                          className="sr-only"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-slate-200 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsMonthDropdownOpen(false)}
+                    className="ivs-btn ivs-btn-ghost px-3 py-1 text-[12px]"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
           <div>
             <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Due Date</label>
             <input
@@ -610,13 +720,11 @@ export default function FeeCalculator({
           </button>
         </div>
 
-        <div className="px-1">
+        <div className="px-1 overflow-x-auto">
           <div
-            className="grid gap-2 items-end text-[9px] font-semibold text-slate-500 uppercase tracking-wide"
+            className="grid gap-2 items-end text-[9px] font-semibold text-slate-500 uppercase tracking-wide min-w-[1280px]"
             style={{
-              gridTemplateColumns: showQtyColumn
-                ? "1.1fr 1.2fr 1.1fr 0.7fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px"
-                : "1.1fr 1.2fr 1.1fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px"
+              gridTemplateColumns: studentGridColumns
             }}
           >
             <div>Student</div>
@@ -627,7 +735,6 @@ export default function FeeCalculator({
             <div>Regular</div>
             <div>Payable</div>
             <div>Registration</div>
-            <div>Exempt</div>
             <div></div>
           </div>
         </div>
@@ -637,17 +744,15 @@ export default function FeeCalculator({
             const selectedProgram = settings.programs?.find(p => p.id === student.programId);
             const regAllowed = isRegularProgram(student.programId);
 
-            const cols = showQtyColumn
-              ? "1.1fr 1.2fr 1.1fr 0.7fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px"
-              : "1.1fr 1.2fr 1.1fr 0.85fr 0.8fr 0.8fr 1.15fr 0.45fr 56px";
+            const cols = studentGridColumns;
 
-            const mainRegular = getStudentRegularFee(student);
-            const mainPayable = calcFinalFee(getStudentActualFee(student), student.customDiscount, student.exemptFromGlobalDiscounts);
-            const mainRegNet = regNet(student.includeRegistration, student.registrationDiscount, student.programId);
+            const mainRegular = getStudentRegularFee(student) * monthMultiplier;
+            const mainPayable = calcFinalFee(getStudentActualFee(student), student.customDiscount) * monthMultiplier;
+            const mainRegNet = regNet(student.includeRegistration, student.programId, student.gradeId, student.registrationDiscount);
 
             return (
-              <div key={student.id} className="border border-slate-200 rounded-xl bg-white">
-                <div className="px-3 py-1 border-b border-slate-200 flex items-center justify-between">
+              <div key={student.id} className="border border-slate-200 rounded-xl bg-white overflow-x-auto">
+                <div className="px-3 py-1 border-b border-slate-200 flex items-center justify-between min-w-[1280px]">
                   <div className="flex items-center gap-2">
                     <span className="ivs-pill px-2 py-0.5">Student {idx + 1}</span>
                     <span className="text-sm font-semibold text-slate-900">{student.name?.trim() ? student.name.trim() : '—'}</span>
@@ -672,7 +777,7 @@ export default function FeeCalculator({
                   </div>
                 </div>
 
-                <div className="px-3 py-1.5 border-b border-slate-100">
+                <div className="px-3 py-1.5 border-b border-slate-100 min-w-[1280px]">
                   <div className="grid gap-2 items-center" style={{ gridTemplateColumns: cols }}>
                     <div>
                       <input
@@ -740,47 +845,15 @@ export default function FeeCalculator({
                     <div className="font-semibold text-slate-900 text-sm">{formatV(mainRegular)}</div>
                     <div className="font-semibold text-[#7a1f2b] text-sm">{formatV(mainPayable)}</div>
 
-                    <div>
-                      {regAllowed ? (
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={student.includeRegistration}
-                              onChange={(e) => updateStudent(student.id, 'includeRegistration', e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-                          </label>
-
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={student.registrationDiscount || 0}
-                            onChange={(e) => updateStudent(student.id, 'registrationDiscount', Number(e.target.value))}
-                            className="ivs-input h-8 py-1 px-2 w-16"
-                          />
-
-                          <div className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">
-                            {student.includeRegistration ? formatV(mainRegNet) : formatV(0)}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400">—</div>
+                    <div className="overflow-visible">
+                      {renderRegistrationBox(
+                        regAllowed,
+                        student.includeRegistration,
+                        student.registrationDiscount,
+                        mainRegNet,
+                        (value) => updateStudent(student.id, 'includeRegistration', value),
+                        (value) => updateStudent(student.id, 'registrationDiscount', value)
                       )}
-                    </div>
-
-                    <div className="flex items-center justify-center">
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={student.exemptFromGlobalDiscounts}
-                          onChange={(e) => updateStudent(student.id, 'exemptFromGlobalDiscounts', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-                      </label>
                     </div>
 
                     <div className="flex items-center justify-center">
@@ -790,14 +863,14 @@ export default function FeeCalculator({
                 </div>
 
                 {student.additionalPrograms.length > 0 && (
-                  <div className="px-3 pb-2">
+                  <div className="px-3 pb-2 min-w-[1280px]">
                     {student.additionalPrograms.map((ap) => {
                       const apProgram = settings.programs?.find(p => p.id === ap.programId);
                       const apRegAllowed = isRegularProgram(ap.programId);
 
-                      const apRegular = getAPRegularFee(ap);
-                      const apPayable = calcFinalFee(getAPActualFee(ap), ap.customDiscount, ap.exemptFromGlobalDiscounts);
-                      const apRegNet = regNet(ap.includeRegistration, ap.registrationDiscount, ap.programId);
+                      const apRegular = getAPRegularFee(ap) * monthMultiplier;
+                      const apPayable = calcFinalFee(getAPActualFee(ap), ap.customDiscount) * monthMultiplier;
+                      const apRegNet = regNet(ap.includeRegistration, ap.programId, ap.gradeId, ap.registrationDiscount);
 
                       return (
                         <div key={ap.id} className="pt-1.5">
@@ -862,47 +935,15 @@ export default function FeeCalculator({
                             <div className="font-semibold text-slate-900 text-sm">{formatV(apRegular)}</div>
                             <div className="font-semibold text-[#7a1f2b] text-sm">{formatV(apPayable)}</div>
 
-                            <div>
-                              {apRegAllowed ? (
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                                    <input
-                                      type="checkbox"
-                                      checked={ap.includeRegistration}
-                                      onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'includeRegistration', e.target.checked)}
-                                      className="sr-only peer"
-                                    />
-                                    <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-                                  </label>
-
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={ap.registrationDiscount || 0}
-                                    onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'registrationDiscount', Number(e.target.value))}
-                                    className="ivs-input h-8 py-1 px-2 w-16"
-                                  />
-
-                                  <div className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">
-                                    {ap.includeRegistration ? formatV(apRegNet) : formatV(0)}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-[11px] text-slate-400">—</div>
+                            <div className="overflow-visible">
+                              {renderRegistrationBox(
+                                apRegAllowed,
+                                ap.includeRegistration,
+                                ap.registrationDiscount,
+                                apRegNet,
+                                (value) => updateAdditionalProgram(student.id, ap.id, 'includeRegistration', value),
+                                (value) => updateAdditionalProgram(student.id, ap.id, 'registrationDiscount', value)
                               )}
-                            </div>
-
-                            <div className="flex items-center justify-center">
-                              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                                <input
-                                  type="checkbox"
-                                  checked={ap.exemptFromGlobalDiscounts}
-                                  onChange={(e) => updateAdditionalProgram(student.id, ap.id, 'exemptFromGlobalDiscounts', e.target.checked)}
-                                  className="sr-only peer"
-                                />
-                                <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-                              </label>
                             </div>
 
                             <div className="flex items-center justify-center">
@@ -931,7 +972,9 @@ export default function FeeCalculator({
         <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Final Summary</h2>
-            <div className="text-[10px] ivs-subtle mt-0.5">Each student payable + overall totals</div>
+            <div className="text-[10px] ivs-subtle mt-0.5">
+              Each student payable + overall totals for {selectedMonths.length} month(s)
+            </div>
           </div>
 
           <button

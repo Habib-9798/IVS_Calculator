@@ -48,7 +48,17 @@ export default function SettingsPanel({ settings, setSettings }: Props) {
       if (p.id === programId) {
         return {
           ...p,
-          grades: [...p.grades, { id: `grade - ${Date.now()} `, name: 'New Entry', fee: 0, discountedFee: 0 }]
+          grades: [
+            ...p.grades,
+            {
+              id: `grade - ${Date.now()} `,
+              name: 'New Entry',
+              fee: 0,
+              discountedFee: 0,
+              registrationFee: 0,
+              registrationDiscountedFee: 0
+            }
+          ]
         };
       }
       return p;
@@ -348,13 +358,18 @@ export default function SettingsPanel({ settings, setSettings }: Props) {
               <div className="p-4 space-y-3">
                 {(program?.grades?.length || 0) > 0 && (
                   <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
-                    <div className="col-span-12">Level / Grade List</div>
+                    <div className="col-span-4">Level / Grade List</div>
+                    <div className="col-span-2">Regular Fee</div>
+                    <div className="col-span-2">Discounted Fee</div>
+                    <div className="col-span-2">Reg. Fee</div>
+                    <div className="col-span-1">Reg. Discounted</div>
+                    <div className="col-span-1"></div>
                   </div>
                 )}
 
                 {(program?.grades || []).map((grade) => (
                   <div key={grade?.id} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-5">
+                    <div className="col-span-4">
                       <input
                         type="text"
                         value={grade?.name || ''}
@@ -363,7 +378,7 @@ export default function SettingsPanel({ settings, setSettings }: Props) {
                         placeholder="Grade Name"
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <input
                         type="number"
                         min="0"
@@ -373,7 +388,7 @@ export default function SettingsPanel({ settings, setSettings }: Props) {
                         placeholder="Fee"
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <input
                         type="number"
                         min="0"
@@ -381,6 +396,26 @@ export default function SettingsPanel({ settings, setSettings }: Props) {
                         onChange={(e) => updateGrade(program.id, grade.id, 'discountedFee', Number(e.target.value))}
                         className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         placeholder="Discounted"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={grade?.registrationFee || 0}
+                        onChange={(e) => updateGrade(program.id, grade.id, 'registrationFee', Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Reg. Fee"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <input
+                        type="number"
+                        min="0"
+                        value={grade?.registrationDiscountedFee || 0}
+                        onChange={(e) => updateGrade(program.id, grade.id, 'registrationDiscountedFee', Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Reg. Disc."
                       />
                     </div>
                     <div className="col-span-1 flex justify-center">

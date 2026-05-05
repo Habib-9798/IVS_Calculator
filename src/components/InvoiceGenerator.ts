@@ -7,10 +7,15 @@ interface InvoiceData {
   fCode: string;
   issuedOn: string;
   dueDate: string;
+  monthCount?: number;
+  selectedMonths?: string[];
+  billingMonths?: string[];
   students: Array<{
     name: string;
     grade: string;
     month: string;
+    months?: string[];
+    monthCount?: number;
     amount: number;
     regularFee: number;
     discountedFee: number;
@@ -116,6 +121,13 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const { settings } = data;
 
+  const monthCount = data.monthCount || data.selectedMonths?.length || data.billingMonths?.length || 1;
+  const selectedMonthList = data.billingMonths || data.selectedMonths || [];
+  const billingMonthText =
+    selectedMonthList.length > 0
+      ? selectedMonthList.join(", ")
+      : data.students?.[0]?.month || "";
+
   // ===== Page 1 Header =====
   let y = MARGIN;
   try {
@@ -194,8 +206,20 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
   doc.text(`${data.currency} (1 SAR = ${data.exchangeRate.toFixed(4)} ${data.currency})`, leftValueX, y);
+  y += rowSpacing;
 
-  y += 10;
+  // Row 4
+  doc.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+  doc.setFont("helvetica", "normal");
+  doc.text("Billing Months:", leftLabelX, y);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  const billingLines = doc.splitTextToSize(`${monthCount} month(s) - ${billingMonthText}`, 132);
+  doc.text(billingLines, leftValueX, y);
+  y += Math.max(rowSpacing, billingLines.length * 4.5);
+
+  y += 5;
 
   // ===== Fee Table =====
   const tableHead = [
@@ -205,7 +229,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       { content: "Grade", styles: { halign: "left" as const } },
       { content: `Regular Fee\n(${data.currency})`, styles: { halign: "right" as const } },
       { content: `After Disc.\n(${data.currency})`, styles: { halign: "right" as const } },
-      { content: "Month", styles: { halign: "center" as const } },
+      { content: "Month(s)", styles: { halign: "center" as const } },
       { content: `Amount\n(${data.currency})`, styles: { halign: "right" as const } },
     ],
   ];
@@ -216,6 +240,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     const qtyTxt = s.quantity > 1 ? ` (x${s.quantity})` : "";
     const normalFee = Number(s.regularFee || 0);
     const finalFee = Number(s.finalFee || 0);
+    const rowMonthCount = s.monthCount || monthCount;
     const pricingSuffix =
       s.pricingType === "subject"
         ? "\n(Fee per subject)"
@@ -229,21 +254,21 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       s.grade,
       formatN(normalFee),
       Math.abs(finalFee - normalFee) > 0.01 ? formatN(finalFee) : "-",
-      s.month,
+      `${rowMonthCount}`,
       formatN(finalFee),
     ]);
   }
 
   if (data.registrationEntries && data.registrationEntries.length > 0) {
     for (const reg of data.registrationEntries) {
-      const discountTxt = reg.discount > 0 ? `\n(${reg.discount}% off)` : "";
+      const discountTxt = reg.discount > 0 ? `\n(Saved ${formatC(reg.discount)})` : "";
       rows.push([
         "N/A",
         `Registration Fee - ${reg.name}${discountTxt}`,
         "",
         formatN(reg.fullFee),
         reg.discount > 0 ? formatN(reg.netFee) : "-",
-        "",
+        "One-time",
         formatN(reg.netFee),
       ]);
     }
@@ -358,12 +383,12 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
     columnStyles: {
       0: { cellWidth: 12, halign: "left" },
-      1: { cellWidth: 48, halign: "left" },
-      2: { cellWidth: 32, halign: "left" },
+      1: { cellWidth: 50, halign: "left" },
+      2: { cellWidth: 34, halign: "left" },
       3: { cellWidth: 22, halign: "right" },
-      4: { cellWidth: 20, halign: "right" },
-      5: { cellWidth: 20, halign: "center" },
-      6: { cellWidth: 26, halign: "right" },
+      4: { cellWidth: 22, halign: "right" },
+      5: { cellWidth: 18, halign: "center" },
+      6: { cellWidth: 22, halign: "right" },
     },
 
     didParseCell: (hook) => {

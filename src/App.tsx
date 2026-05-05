@@ -11,11 +11,8 @@ import {
   Calculator,
   Coins,
   GraduationCap,
-  Layers,
-  Percent,
   Settings,
   ShieldAlert,
-  Users,
   Lock,
   LogOut,
 } from "lucide-react";
@@ -42,10 +39,6 @@ export default function App() {
     }
     return DEFAULT_SETTINGS;
   });
-
-  const [siblingDiscount, setSiblingDiscount] = useState<number>(0);
-  const [multiProgramDiscount, setMultiProgramDiscount] = useState<number>(0);
-  const [fixedDiscount, setFixedDiscount] = useState<number>(0);
 
   useEffect(() => {
     sessionStorage.setItem("iqra_current_settings", JSON.stringify(settings));
@@ -222,50 +215,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex-1 flex items-center justify-center">
-              {activeTab === "calculator" && (
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-sm">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200">
-                    <Users className="w-4 h-4 text-[#7a1f2b]" />
-                    <span className="text-xs font-semibold text-slate-600">Sibling %</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={siblingDiscount}
-                      onChange={(e) => setSiblingDiscount(Number(e.target.value))}
-                      className="w-14 bg-transparent text-sm font-bold text-slate-800 outline-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200">
-                    <Layers className="w-4 h-4 text-[#7a1f2b]" />
-                    <span className="text-xs font-semibold text-slate-600">Multi Program %</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={multiProgramDiscount}
-                      onChange={(e) => setMultiProgramDiscount(Number(e.target.value))}
-                      className="w-14 bg-transparent text-sm font-bold text-slate-800 outline-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200">
-                    <Percent className="w-4 h-4 text-[#7a1f2b]" />
-                    <span className="text-xs font-semibold text-slate-600">Fixed</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={fixedDiscount}
-                      onChange={(e) => setFixedDiscount(Number(e.target.value))}
-                      className="w-16 bg-transparent text-sm font-bold text-slate-800 outline-none"
-                    />
-                    <span className="text-xs font-semibold text-slate-500">SAR</span>
-                  </div>
-                </div>
-              )}
-            </div>
+            <div className="flex-1"></div>
 
             <div className="flex items-center gap-3 min-w-[520px] justify-end">
               <button
@@ -340,15 +290,7 @@ export default function App() {
 
       <div className="pt-6 px-6 w-full">
         {activeTab === "calculator" ? (
-          <FeeCalculator
-            settings={settings}
-            siblingDiscount={siblingDiscount}
-            setSiblingDiscount={setSiblingDiscount}
-            multiProgramDiscount={multiProgramDiscount}
-            setMultiProgramDiscount={setMultiProgramDiscount}
-            fixedDiscount={fixedDiscount}
-            setFixedDiscount={setFixedDiscount}
-          />
+          <FeeCalculator settings={settings} />
         ) : (
           <SettingsPanel settings={settings} setSettings={setSettings} />
         )}

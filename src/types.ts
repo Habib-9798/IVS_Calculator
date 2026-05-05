@@ -3,6 +3,8 @@ export interface GradeFee {
   name: string;
   fee: number;
   discountedFee: number;
+  registrationFee: number;
+  registrationDiscountedFee: number;
 }
 
 export interface Program {
@@ -45,109 +47,127 @@ export const DEFAULT_SETTINGS: AppSettings = {
           "id": "fs1",
           "name": "FS1 ",
           "fee": 245,
-          "discountedFee": 195
+          "discountedFee": 195,
+          "registrationFee": 300
         },
         {
           "id": "grade - 1771934483570 ",
           "name": "FS2",
           "fee": 245,
-          "discountedFee": 195
+          "discountedFee": 195,
+          "registrationFee": 300
         },
         {
           "id": "grade - 1771934526713 ",
           "name": "FS3",
           "fee": 245,
-          "discountedFee": 195
+          "discountedFee": 195,
+          "registrationFee": 300
         },
         {
           "id": "grade - 1771934531330 ",
           "name": "Grade 1",
           "fee": 295,
-          "discountedFee": 235
+          "discountedFee": 235,
+          "registrationFee": 300
         },
         {
           "id": "grade - 1771934542610 ",
           "name": "Grade 2",
           "fee": 295,
-          "discountedFee": 235
+          "discountedFee": 235,
+          "registrationFee": 300
         },
         {
           "id": "grade - 1771934546266 ",
           "name": "Grade 3",
           "fee": 295,
-          "discountedFee": 235
+          "discountedFee": 235,
+          "registrationFee": 300
         },
         {
           "id": "grade - 1771934550098 ",
           "name": "Grade 4",
           "fee": 345,
-          "discountedFee": 275
+          "discountedFee": 275,
+          "registrationFee": 400
         },
         {
           "id": "grade - 1771934553338 ",
           "name": "Grade 5",
           "fee": 345,
-          "discountedFee": 275
+          "discountedFee": 275,
+          "registrationFee": 400
         },
         {
           "id": "grade - 1771934559417 ",
           "name": "Grade 6",
           "fee": 345,
-          "discountedFee": 275
+          "discountedFee": 275,
+          "registrationFee": 400
         },
         {
           "id": "grade - 1771934565306 ",
           "name": "Grade 7",
           "fee": 400,
-          "discountedFee": 335
+          "discountedFee": 335,
+          "registrationFee": 400
         },
         {
           "id": "grade - 1771934570562 ",
           "name": "Grade 8 (Fed)",
           "fee": 400,
-          "discountedFee": 335
+          "discountedFee": 335,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934579057 ",
           "name": "Grade 9 (Fed)",
           "fee": 400,
-          "discountedFee": 335
+          "discountedFee": 335,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934588730 ",
           "name": "Grade 10 (Fed)",
           "fee": 400,
-          "discountedFee": 335
+          "discountedFee": 335,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934595393 ",
           "name": "Grade 11 (Fed)",
           "fee": 450,
-          "discountedFee": 375
+          "discountedFee": 375,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934649474 ",
           "name": "Grade 12 (Fed)",
           "fee": 450,
-          "discountedFee": 375
+          "discountedFee": 375,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934656361 ",
           "name": "Grade 8 (IGCSE/O Level's)",
           "fee": 450,
-          "discountedFee": 375
+          "discountedFee": 375,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934682698 ",
           "name": "Grade 9 (IGCSE/O Level's)",
           "fee": 450,
-          "discountedFee": 375
+          "discountedFee": 375,
+          "registrationFee": 500
         },
         {
           "id": "grade - 1771934686985 ",
           "name": "Grade 10 (IGCSE/O Level's)",
           "fee": 500,
-          "discountedFee": 415
+          "discountedFee": 415,
+          "registrationFee": 500
         }
       ]
     },
