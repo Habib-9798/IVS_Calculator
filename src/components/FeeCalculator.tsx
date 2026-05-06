@@ -281,6 +281,16 @@ export default function FeeCalculator({ settings }: Props) {
     return Math.max(0, fullFee - (fullFee * safeDiscount / 100));
   };
 
+  const hasDiscountedFee = (programId: string, gradeId: string) => {
+    const grade = getGrade(programId, gradeId);
+    if (!grade) return false;
+
+    const regularFee = Number(grade.fee) || 0;
+    const discountedFee = Number(grade.discountedFee) || 0;
+
+    return regularFee > 0 && discountedFee > 0 && discountedFee < regularFee;
+  };
+
   const allAPList = students.flatMap(s => s.additionalPrograms);
 
   const monthlyAPRegularTotal = allAPList.reduce((sum, ap) => sum + getAPRegularFee(ap), 0);
@@ -349,8 +359,8 @@ export default function FeeCalculator({ settings }: Props) {
         : '';
 
   const studentGridColumns = showQtyColumn
-    ? "1.05fr 1.15fr 1.05fr 0.65fr 0.75fr 0.75fr 0.75fr 2.05fr 56px"
-    : "1.05fr 1.15fr 1.05fr 0.75fr 0.75fr 0.75fr 2.05fr 56px";
+    ? "1.05fr 1.15fr 1.05fr 0.65fr 0.75fr 0.9fr 0.75fr 2.05fr 56px"
+    : "1.05fr 1.15fr 1.05fr 0.75fr 0.9fr 0.75fr 2.05fr 56px";
 
   const calcFinalFee = (actualFee: number, customDiscount: number) => {
     return Math.max(0, actualFee - (Number(customDiscount) || 0));
@@ -364,6 +374,45 @@ export default function FeeCalculator({ settings }: Props) {
   const regFull = (include: boolean, programId: string, gradeId: string) => {
     if (!include) return 0;
     return getRegistrationFullFee(programId, gradeId);
+  };
+
+  const renderFeeTypeToggle = (
+    allowed: boolean,
+    checked: boolean,
+    regularAmount: number,
+    discountedAmount: number,
+    onToggle: (value: boolean) => void
+  ) => {
+    return (
+      <div className="flex items-center gap-2 min-w-[145px]">
+        <label
+          className={`relative inline-flex items-center shrink-0 ${
+            allowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+          }`}
+          title={allowed ? 'Use discounted fee' : 'Discounted fee is not available for this grade'}
+        >
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={!allowed}
+            onChange={(e) => onToggle(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="relative w-8 h-4 bg-slate-300 rounded-full peer-focus:ring-2 peer-focus:ring-[#7a1f2b]/20 peer-checked:bg-[#7a1f2b] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+        </label>
+
+        <div className="leading-tight">
+          <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">
+            {formatV(regularAmount)}
+          </div>
+          {checked && allowed && (
+            <div className="text-[10px] font-bold text-[#7a1f2b] whitespace-nowrap">
+              Disc {formatV(discountedAmount)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const renderRegistrationBox = (
@@ -746,9 +795,13 @@ export default function FeeCalculator({ settings }: Props) {
 
             const cols = studentGridColumns;
 
-            const mainRegular = getStudentRegularFee(student) * monthMultiplier;
-            const mainPayable = calcFinalFee(getStudentActualFee(student), student.customDiscount) * monthMultiplier;
+            const mainRegularMonthly = getStudentRegularFee(student);
+            const mainActualMonthly = getStudentActualFee(student);
+            const mainRegular = mainRegularMonthly * monthMultiplier;
+            const mainActual = mainActualMonthly * monthMultiplier;
+            const mainPayable = calcFinalFee(mainActualMonthly, student.customDiscount) * monthMultiplier;
             const mainRegNet = regNet(student.includeRegistration, student.programId, student.gradeId, student.registrationDiscount);
+            const mainDiscountAllowed = hasDiscountedFee(student.programId, student.gradeId);
 
             return (
               <div key={student.id} className="border border-slate-200 rounded-xl bg-white overflow-x-auto">
@@ -842,7 +895,16 @@ export default function FeeCalculator({ settings }: Props) {
                       />
                     </div>
 
-                    <div className="font-semibold text-slate-900 text-sm">{formatV(mainRegular)}</div>
+                    <div>
+                      {renderFeeTypeToggle(
+                        mainDiscountAllowed,
+                        student.feeType === 'discounted',
+                        mainRegular,
+                        mainActual,
+                        (value) => updateStudent(student.id, 'feeType', value ? 'discounted' : 'regular')
+                      )}
+                    </div>
+
                     <div className="font-semibold text-[#7a1f2b] text-sm">{formatV(mainPayable)}</div>
 
                     <div className="overflow-visible">
@@ -868,9 +930,13 @@ export default function FeeCalculator({ settings }: Props) {
                       const apProgram = settings.programs?.find(p => p.id === ap.programId);
                       const apRegAllowed = isRegularProgram(ap.programId);
 
-                      const apRegular = getAPRegularFee(ap) * monthMultiplier;
-                      const apPayable = calcFinalFee(getAPActualFee(ap), ap.customDiscount) * monthMultiplier;
+                      const apRegularMonthly = getAPRegularFee(ap);
+                      const apActualMonthly = getAPActualFee(ap);
+                      const apRegular = apRegularMonthly * monthMultiplier;
+                      const apActual = apActualMonthly * monthMultiplier;
+                      const apPayable = calcFinalFee(apActualMonthly, ap.customDiscount) * monthMultiplier;
                       const apRegNet = regNet(ap.includeRegistration, ap.programId, ap.gradeId, ap.registrationDiscount);
+                      const apDiscountAllowed = hasDiscountedFee(ap.programId, ap.gradeId);
 
                       return (
                         <div key={ap.id} className="pt-1.5">
@@ -932,7 +998,16 @@ export default function FeeCalculator({ settings }: Props) {
                               />
                             </div>
 
-                            <div className="font-semibold text-slate-900 text-sm">{formatV(apRegular)}</div>
+                            <div>
+                              {renderFeeTypeToggle(
+                                apDiscountAllowed,
+                                ap.feeType === 'discounted',
+                                apRegular,
+                                apActual,
+                                (value) => updateAdditionalProgram(student.id, ap.id, 'feeType', value ? 'discounted' : 'regular')
+                              )}
+                            </div>
+
                             <div className="font-semibold text-[#7a1f2b] text-sm">{formatV(apPayable)}</div>
 
                             <div className="overflow-visible">
