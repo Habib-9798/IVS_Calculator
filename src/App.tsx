@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import FeeCalculator from "./components/FeeCalculator";
 import SettingsPanel from "./components/SettingsPanel";
 import { AppSettings, DEFAULT_SETTINGS } from "./types";
+import { getCsrNameFromUrl } from "./utils/csr";
 import {
   Calculator,
   Coins,
@@ -18,7 +19,8 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const APP_PASSWORD = "IqraOffice2026!";
+ const APP_PASSWORD = "IqraOffice2026!";
+ const csrName = getCsrNameFromUrl();
 
   const [enteredPassword, setEnteredPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -290,7 +292,7 @@ export default function App() {
 
       <div className="pt-6 px-6 w-full">
         {activeTab === "calculator" ? (
-          <FeeCalculator settings={settings} />
+          <FeeCalculator settings={settings} csrName={csrName} />
         ) : (
           <SettingsPanel settings={settings} setSettings={setSettings} />
         )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, FileText, GraduationCap, User, BookPlus, ChevronDown, Check } from 'lucide-react';
 import { generateInvoicePDF } from './InvoiceGenerator';
+import { saveCalculatorEntry } from '../utils/tracking';
 import { format } from 'date-fns';
 import { AppSettings } from '../types';
 
@@ -30,9 +31,10 @@ interface Student {
 
 type Props = {
   settings: AppSettings;
+  csrName: string;
 };
 
-export default function FeeCalculator({ settings }: Props) {
+export default function FeeCalculator({ settings, csrName }: Props) {
   const currentRate = settings.exchangeRates[settings.selectedCurrency] || 1;
   const convert = (amount: number) => amount * currentRate;
   const formatV = (amount: number) => `${settings.selectedCurrency} ${convert(amount).toFixed(2)}`;
@@ -579,7 +581,38 @@ export default function FeeCalculator({ settings }: Props) {
       exchangeRate: currentRate
     };
 
-    await generateInvoicePDF(invoiceData as any);
+    const trackingEntry = {
+  parentName: invoiceData.parentName,
+  fCode: invoiceData.fCode,
+  issuedOn: invoiceData.issuedOn,
+  dueDate: invoiceData.dueDate,
+  monthCount: invoiceData.monthCount,
+  selectedMonths: invoiceData.selectedMonths,
+  billingMonths: invoiceData.billingMonths,
+  students: invoiceData.students,
+  registrationEntries: invoiceData.registrationEntries,
+  totalAmount: invoiceData.totalAmount,
+  programDiscountAmount: invoiceData.programDiscountAmount,
+  customDiscountAmount: invoiceData.customDiscountAmount,
+  enrollmentDiscountAmount: invoiceData.enrollmentDiscountAmount,
+  fixedDiscountAmount: invoiceData.fixedDiscountAmount,
+  finalAmount: invoiceData.finalAmount,
+  currency: invoiceData.currency,
+  exchangeRate: invoiceData.exchangeRate
+};
+
+try {
+  await saveCalculatorEntry({
+    csrName,
+    entry: trackingEntry
+  });
+} catch (error) {
+  console.error("Failed to save calculator entry:", error);
+  alert("The invoice data could not be saved. The PDF was not generated. Please check the internet connection and try again.");
+  return;
+}
+
+await generateInvoicePDF(invoiceData as any);
   };
 
   const studentTotals = students.map((s, idx) => {
