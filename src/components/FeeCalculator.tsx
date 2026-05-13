@@ -72,6 +72,28 @@ export default function FeeCalculator({ settings, csrName }: Props) {
       : `${selectedMonths.length} month(s) selected`;
 
   const [studentCount, setStudentCount] = useState<number>(students.length);
+  const getEmptyStudent = (): Student => ({
+  id: Math.random().toString(36).substr(2, 9),
+  name: '',
+  programId: '',
+  gradeId: '',
+  feeType: 'regular',
+  customDiscount: 0,
+  quantity: 1,
+  additionalPrograms: [],
+  includeRegistration: false,
+  registrationDiscount: 50
+});
+
+const resetCalculatorForm = () => {
+  setParentName('');
+  setFCode('');
+  setStudentCount(1);
+  setStudents([getEmptyStudent()]);
+  setSelectedMonths([format(new Date(), 'MMMM yyyy')]);
+  setIsMonthDropdownOpen(false);
+  setDueDate(format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+};
 
   useEffect(() => {
     const target = Math.min(10, Math.max(1, Number(studentCount) || 1));
@@ -613,6 +635,7 @@ try {
 }
 
 await generateInvoicePDF(invoiceData as any);
+resetCalculatorForm();
   };
 
   const studentTotals = students.map((s, idx) => {
@@ -837,7 +860,7 @@ await generateInvoicePDF(invoiceData as any);
             const mainRegular = mainRegularMonthly * monthMultiplier;
             const mainActual = mainActualMonthly * monthMultiplier;
             const mainPayable = calcFinalFee(mainActualMonthly, student.customDiscount) * monthMultiplier;
-            const mainRegNet = regNet(student.includeRegistration, student.programId, student.gradeId, student.registrationDiscount);
+            const mainRegNet = regNet(Boolean(student.includeRegistration), student.programId, student.gradeId, student.registrationDiscount);
             const mainDiscountAllowed = Boolean(hasDiscountedFee(student.programId, student.gradeId));
             const mainDiscountedDisplay = getDiscountedFeeDisplay(student.programId, student.gradeId, student.quantity) * monthMultiplier;
 
