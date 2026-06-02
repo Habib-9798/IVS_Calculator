@@ -339,12 +339,12 @@ const resetCalculatorForm = () => {
   const totalRegistrationFee = students.reduce((sum, s) => {
     let studentReg = 0;
 
-    if (s.includeRegistration && isRegularProgram(s.programId)) {
+    if (Boolean(s.includeRegistration) && isRegularProgram(s.programId)) {
       studentReg += getRegistrationNetFee(s.programId, s.gradeId, s.registrationDiscount);
     }
 
     s.additionalPrograms.forEach(ap => {
-      if (ap.includeRegistration && isRegularProgram(ap.programId)) {
+      if (Boolean(ap.includeRegistration) && isRegularProgram(ap.programId)) {
         studentReg += getRegistrationNetFee(ap.programId, ap.gradeId, ap.registrationDiscount);
       }
     });
@@ -561,7 +561,7 @@ const resetCalculatorForm = () => {
       registrationEntries: students.flatMap(s => {
         const entries: any[] = [];
 
-        if (s.includeRegistration && isRegularProgram(s.programId)) {
+        if (Boolean(s.includeRegistration) && isRegularProgram(s.programId)) {
           const fullFee = getRegistrationFullFee(s.programId, s.gradeId);
           const netFee = getRegistrationNetFee(s.programId, s.gradeId, s.registrationDiscount);
 
@@ -575,7 +575,7 @@ const resetCalculatorForm = () => {
         }
 
         s.additionalPrograms.forEach(ap => {
-          if (ap.includeRegistration && isRegularProgram(ap.programId)) {
+          if (Boolean(ap.includeRegistration) && isRegularProgram(ap.programId)) {
             const apProgram = settings.programs?.find(p => p.id === ap.programId);
             const fullFee = getRegistrationFullFee(ap.programId, ap.gradeId);
             const netFee = getRegistrationNetFee(ap.programId, ap.gradeId, ap.registrationDiscount);
@@ -643,8 +643,8 @@ resetCalculatorForm();
     const apRegular = s.additionalPrograms.reduce((sum, ap) => sum + (getAPRegularFee(ap) * monthMultiplier), 0);
 
     const regFullTotal =
-      regFull(s.includeRegistration, s.programId, s.gradeId) +
-      s.additionalPrograms.reduce((sum, ap) => sum + regFull(ap.includeRegistration, ap.programId, ap.gradeId), 0);
+      regFull(Boolean(s.includeRegistration), s.programId, s.gradeId) +
+      s.additionalPrograms.reduce((sum, ap) => sum + regFull(Boolean(ap.includeRegistration), ap.programId, ap.gradeId), 0);
 
     const regularTotal = mainRegular + apRegular + regFullTotal;
 
@@ -655,8 +655,8 @@ resetCalculatorForm();
     );
 
     const regNetTotal =
-      regNet(s.includeRegistration, s.programId, s.gradeId, s.registrationDiscount) +
-      s.additionalPrograms.reduce((sum, ap) => sum + regNet(ap.includeRegistration, ap.programId, ap.gradeId, ap.registrationDiscount), 0);
+      regNet(Boolean(s.includeRegistration), s.programId, s.gradeId, s.registrationDiscount) +
+      s.additionalPrograms.reduce((sum, ap) => sum + regNet(Boolean(ap.includeRegistration), ap.programId, ap.gradeId, ap.registrationDiscount), 0);
 
     const payableTotal = mainPayable + apPayable + regNetTotal;
 
@@ -851,14 +851,13 @@ resetCalculatorForm();
         <div className="mt-1 space-y-1.5">
           {students.map((student, idx) => {
             const selectedProgram = settings.programs?.find(p => p.id === student.programId);
-            const regAllowed = isRegularProgram(student.programId);
+            const regAllowed = Boolean(isRegularProgram(student.programId));
 
             const cols = studentGridColumns;
 
             const mainRegularMonthly = getStudentRegularFee(student);
             const mainActualMonthly = getStudentActualFee(student);
             const mainRegular = mainRegularMonthly * monthMultiplier;
-            const mainActual = mainActualMonthly * monthMultiplier;
             const mainPayable = calcFinalFee(mainActualMonthly, student.customDiscount) * monthMultiplier;
             const mainRegNet = regNet(Boolean(student.includeRegistration), student.programId, student.gradeId, student.registrationDiscount);
             const mainDiscountAllowed = Boolean(hasDiscountedFee(student.programId, student.gradeId));
@@ -971,7 +970,7 @@ resetCalculatorForm();
                     <div className="overflow-visible">
                       {renderRegistrationBox(
                         regAllowed,
-                        student.includeRegistration,
+                        Boolean(student.includeRegistration),
                         student.registrationDiscount,
                         mainRegNet,
                         (value) => updateStudent(student.id, 'includeRegistration', value),
@@ -989,13 +988,13 @@ resetCalculatorForm();
                   <div className="px-3 pb-2 min-w-[1280px]">
                     {student.additionalPrograms.map((ap) => {
                       const apProgram = settings.programs?.find(p => p.id === ap.programId);
-                      const apRegAllowed = isRegularProgram(ap.programId);
+                      const apRegAllowed = Boolean(isRegularProgram(ap.programId));
 
                       const apRegularMonthly = getAPRegularFee(ap);
                       const apActualMonthly = getAPActualFee(ap);
                       const apRegular = apRegularMonthly * monthMultiplier;
                       const apPayable = calcFinalFee(apActualMonthly, ap.customDiscount) * monthMultiplier;
-                      const apRegNet = regNet(ap.includeRegistration, ap.programId, ap.gradeId, ap.registrationDiscount);
+                      const apRegNet = regNet(Boolean(ap.includeRegistration), ap.programId, ap.gradeId, ap.registrationDiscount);
                       const apDiscountAllowed = Boolean(hasDiscountedFee(ap.programId, ap.gradeId));
                       const apDiscountedDisplay = getDiscountedFeeDisplay(ap.programId, ap.gradeId, ap.quantity) * monthMultiplier;
 
@@ -1074,7 +1073,7 @@ resetCalculatorForm();
                             <div className="overflow-visible">
                               {renderRegistrationBox(
                                 apRegAllowed,
-                                ap.includeRegistration,
+                                Boolean(ap.includeRegistration),
                                 ap.registrationDiscount,
                                 apRegNet,
                                 (value) => updateAdditionalProgram(student.id, ap.id, 'includeRegistration', value),
