@@ -81,71 +81,99 @@ serve(async (request) => {
       payload: entry,
     };
 
+    // ── Step 1: INSERT into Supabase (fast, ~200ms) ──────────────────────────
     const { data, error } = await supabase
       .from("calculator_entries")
       .insert(row)
       .select("id")
       .single();
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    const googleSheetWebhookUrl = Deno.env.get("GOOGLE_SHEET_WEBHOOK_URL");
+    const recordId = data.id;
 
-    if (!googleSheetWebhookUrl) {
-      throw new Error("Google Sheet webhook URL is missing.");
-    }
-
+    // Build the Google Sheets payload now (while we still have all the data)
     const googlePayload = {
-      id: data.id,
+      id: recordId,
       createdAt: new Date().toISOString(),
       csrName,
       sourceUrl: body?.sourceUrl || null,
       ...entry,
     };
 
-    const webhookResponse = await fetch(googleSheetWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(googlePayload),
-    });
+    // ── Step 2: Google Sheets sync runs in the BACKGROUND ───────────────────
+    // The client gets a response immediately after the INSERT above.
+    // The webhook call (which can take 30–120 s) no longer blocks PDF generation.
+    const googleSheetWebhookUrl = Deno.env.get("GOOGLE_SHEET_WEBHOOK_URL");
 
-    if (!webhookResponse.ok) {
-      const webhookError = await webhookResponse.text();
+    const sheetSyncTask = (async () => {
+      if (!googleSheetWebhookUrl) {
+        await supabase
+          .from("calculator_entries")
+          .update({
+            google_sheet_sent: false,
+            google_sheet_error: "GOOGLE_SHEET_WEBHOOK_URL env var not set",
+          })
+          .eq("id", recordId);
+        return;
+      }
 
-      await supabase
-        .from("calculator_entries")
-        .update({
-          google_sheet_sent: false,
-          google_sheet_error: webhookError || `Webhook failed with status ${webhookResponse.status}`,
-        })
-        .eq("id", data.id);
+      try {
+        const webhookResponse = await fetch(googleSheetWebhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(googlePayload),
+        });
 
-      return new Response(JSON.stringify({ error: "Google Sheet webhook failed" }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        if (!webhookResponse.ok) {
+          const webhookError = await webhookResponse.text();
+          await supabase
+            .from("calculator_entries")
+            .update({
+              google_sheet_sent: false,
+              google_sheet_error: webhookError || `Webhook HTTP ${webhookResponse.status}`,
+            })
+            .eq("id", recordId);
+        } else {
+          await supabase
+            .from("calculator_entries")
+            .update({ google_sheet_sent: true, google_sheet_error: null })
+            .eq("id", recordId);
+        }
+      } catch (err) {
+        await supabase
+          .from("calculator_entries")
+          .update({
+            google_sheet_sent: false,
+            google_sheet_error: err instanceof Error ? err.message : "Background sync failed",
+          })
+          .eq("id", recordId);
+      }
+    })();
+
+    // Keep the Deno runtime alive until the background task finishes.
+    // Without this, Deno may shut down the isolate before the sheet sync completes.
+    try {
+      (globalThis as any).EdgeRuntime.waitUntil(sheetSyncTask);
+    } catch {
+      // EdgeRuntime.waitUntil is unavailable in local dev — task still fires,
+      // it just may be cut short if the process exits early.
     }
 
-    await supabase
-      .from("calculator_entries")
-      .update({
-        google_sheet_sent: true,
-        google_sheet_error: null,
-      })
-      .eq("id", data.id);
-
-    return new Response(JSON.stringify({ success: true, id: data.id }), {
+    // ── Step 3: Respond immediately — client can generate the PDF now ────────
+    return new Response(JSON.stringify({ success: true, id: recordId }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (error) {
     console.error(error);
-
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });

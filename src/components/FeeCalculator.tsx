@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, FileText, GraduationCap, User, BookPlus, ChevronDown, Check } from 'lucide-react';
+import { Plus, Trash2, FileText, GraduationCap, User, BookPlus, ChevronDown, Check, Loader2 } from 'lucide-react';
 import { generateInvoicePDF } from './InvoiceGenerator';
 import { saveCalculatorEntry } from '../utils/tracking';
 import { format } from 'date-fns';
@@ -34,6 +34,27 @@ type Props = {
   csrName: string;
 };
 
+// ─── Draft persistence helpers ────────────────────────────────────────────────
+// Saves all form fields to localStorage so data survives tab switches,
+// History navigation, and accidental refreshes.
+const STORAGE_KEY = 'iqra_calc_draft';
+
+function readDraft() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function FeeCalculator({ settings, csrName }: Props) {
   const currentRate = settings.exchangeRates[settings.selectedCurrency] || 1;
   const convert = (amount: number) => amount * currentRate;
@@ -42,27 +63,35 @@ export default function FeeCalculator({ settings, csrName }: Props) {
   const currentYear = new Date().getFullYear();
   const monthOptions = Array.from({ length: 12 }, (_, i) => format(new Date(currentYear, i, 1), 'MMMM yyyy'));
 
-  const [parentName, setParentName] = useState('');
-  const [fCode, setFCode] = useState('');
+  // ── State — all initialised from the saved draft if one exists ─────────────
+  const [parentName, setParentName] = useState<string>(() => readDraft()?.parentName ?? '');
+  const [fCode, setFCode] = useState<string>(() => readDraft()?.fCode ?? '');
 
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: '1',
-      name: '',
-      programId: '',
-      gradeId: '',
-      feeType: 'regular',
-      customDiscount: 0,
-      quantity: 1,
-      additionalPrograms: [],
-      includeRegistration: false,
-      registrationDiscount: 50
-    }
-  ]);
+  const defaultStudent: Student = {
+    id: '1',
+    name: '',
+    programId: '',
+    gradeId: '',
+    feeType: 'regular',
+    customDiscount: 0,
+    quantity: 1,
+    additionalPrograms: [],
+    includeRegistration: false,
+    registrationDiscount: 50,
+  };
 
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([format(new Date(), 'MMMM yyyy')]);
+  const [students, setStudents] = useState<Student[]>(() => readDraft()?.students ?? [defaultStudent]);
+
+  const [selectedMonths, setSelectedMonths] = useState<string[]>(
+    () => readDraft()?.selectedMonths ?? [format(new Date(), 'MMMM yyyy')]
+  );
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
-  const [dueDate, setDueDate] = useState(format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+  const [dueDate, setDueDate] = useState<string>(
+    () => readDraft()?.dueDate ?? format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+  );
+
+  // Loading state — prevents double-clicks while PDF is generating
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const monthMultiplier = Math.max(1, selectedMonths.length);
   const billingMonthLabel = selectedMonths.length > 0 ? selectedMonths.join(', ') : format(new Date(), 'MMMM yyyy');
@@ -72,28 +101,42 @@ export default function FeeCalculator({ settings, csrName }: Props) {
       : `${selectedMonths.length} month(s) selected`;
 
   const [studentCount, setStudentCount] = useState<number>(students.length);
-  const getEmptyStudent = (): Student => ({
-  id: Math.random().toString(36).substr(2, 9),
-  name: '',
-  programId: '',
-  gradeId: '',
-  feeType: 'regular',
-  customDiscount: 0,
-  quantity: 1,
-  additionalPrograms: [],
-  includeRegistration: false,
-  registrationDiscount: 50
-});
 
-const resetCalculatorForm = () => {
-  setParentName('');
-  setFCode('');
-  setStudentCount(1);
-  setStudents([getEmptyStudent()]);
-  setSelectedMonths([format(new Date(), 'MMMM yyyy')]);
-  setIsMonthDropdownOpen(false);
-  setDueDate(format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
-};
+  // ── Persist form state to localStorage on every change ────────────────────
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ parentName, fCode, students, selectedMonths, dueDate })
+      );
+    } catch {
+      // localStorage unavailable (private mode, quota exceeded) — fail silently
+    }
+  }, [parentName, fCode, students, selectedMonths, dueDate]);
+
+  const getEmptyStudent = (): Student => ({
+    id: Math.random().toString(36).substr(2, 9),
+    name: '',
+    programId: '',
+    gradeId: '',
+    feeType: 'regular',
+    customDiscount: 0,
+    quantity: 1,
+    additionalPrograms: [],
+    includeRegistration: false,
+    registrationDiscount: 50,
+  });
+
+  const resetCalculatorForm = () => {
+    setParentName('');
+    setFCode('');
+    setStudentCount(1);
+    setStudents([getEmptyStudent()]);
+    setSelectedMonths([format(new Date(), 'MMMM yyyy')]);
+    setIsMonthDropdownOpen(false);
+    setDueDate(format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+    clearDraft(); // wipe the saved draft so a fresh session starts clean
+  };
 
   useEffect(() => {
     const target = Math.min(10, Math.max(1, Number(studentCount) || 1));
@@ -501,7 +544,15 @@ const resetCalculatorForm = () => {
     );
   };
 
+  // ── Invoice generation ────────────────────────────────────────────────────
+  // Fix: isGenerating guard prevents multiple simultaneous clicks.
+  // The Supabase save now returns fast (~200 ms) because the Google Sheets
+  // webhook runs in the edge-function background. PDF generates immediately
+  // after the INSERT confirms — no more 1–2 minute wait.
   const handleGenerateInvoice = async () => {
+    if (isGenerating) return; // block double-clicks
+    setIsGenerating(true);
+
     const invoiceData = {
       parentName: parentName || 'Parent',
       fCode,
@@ -604,38 +655,47 @@ const resetCalculatorForm = () => {
     };
 
     const trackingEntry = {
-  parentName: invoiceData.parentName,
-  fCode: invoiceData.fCode,
-  issuedOn: invoiceData.issuedOn,
-  dueDate: invoiceData.dueDate,
-  monthCount: invoiceData.monthCount,
-  selectedMonths: invoiceData.selectedMonths,
-  billingMonths: invoiceData.billingMonths,
-  students: invoiceData.students,
-  registrationEntries: invoiceData.registrationEntries,
-  totalAmount: invoiceData.totalAmount,
-  programDiscountAmount: invoiceData.programDiscountAmount,
-  customDiscountAmount: invoiceData.customDiscountAmount,
-  enrollmentDiscountAmount: invoiceData.enrollmentDiscountAmount,
-  fixedDiscountAmount: invoiceData.fixedDiscountAmount,
-  finalAmount: invoiceData.finalAmount,
-  currency: invoiceData.currency,
-  exchangeRate: invoiceData.exchangeRate
-};
+      parentName: invoiceData.parentName,
+      fCode: invoiceData.fCode,
+      issuedOn: invoiceData.issuedOn,
+      dueDate: invoiceData.dueDate,
+      monthCount: invoiceData.monthCount,
+      selectedMonths: invoiceData.selectedMonths,
+      billingMonths: invoiceData.billingMonths,
+      students: invoiceData.students,
+      registrationEntries: invoiceData.registrationEntries,
+      totalAmount: invoiceData.totalAmount,
+      programDiscountAmount: invoiceData.programDiscountAmount,
+      customDiscountAmount: invoiceData.customDiscountAmount,
+      enrollmentDiscountAmount: invoiceData.enrollmentDiscountAmount,
+      fixedDiscountAmount: invoiceData.fixedDiscountAmount,
+      finalAmount: invoiceData.finalAmount,
+      currency: invoiceData.currency,
+      exchangeRate: invoiceData.exchangeRate
+    };
 
-try {
-  await saveCalculatorEntry({
-    csrName,
-    entry: trackingEntry
-  });
-} catch (error) {
-  console.error("Failed to save calculator entry:", error);
-  alert("The invoice data could not be saved. The PDF was not generated. Please check the internet connection and try again.");
-  return;
-}
+    // Step 1: Save to Supabase.
+    // The edge function now responds immediately after the DB INSERT (~200 ms).
+    // Google Sheets sync continues in the background on the server.
+    try {
+      await saveCalculatorEntry({ csrName, entry: trackingEntry });
+    } catch (error) {
+      console.error("Failed to save calculator entry:", error);
+      alert("The invoice data could not be saved. The PDF was not generated. Please check the internet connection and try again.");
+      setIsGenerating(false);
+      return;
+    }
 
-await generateInvoicePDF(invoiceData as any);
-resetCalculatorForm();
+    // Step 2: Generate PDF — runs right after Supabase confirms, no Sheets wait.
+    try {
+      await generateInvoicePDF(invoiceData as any);
+      resetCalculatorForm();
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      alert("PDF generation failed. Your entry has been saved. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const studentTotals = students.map((s, idx) => {
@@ -1115,11 +1175,20 @@ resetCalculatorForm();
           <button
             type="button"
             onClick={handleGenerateInvoice}
-            disabled={finalTotal === 0}
-            className="bg-[#7a1f2b] hover:bg-[#651a23] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md text-[13px]"
+            disabled={finalTotal === 0 || isGenerating}
+            className="bg-[#7a1f2b] hover:bg-[#651a23] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md text-[13px] min-w-[200px]"
           >
-            <FileText className="w-5 h-5" />
-            Generate Invoice PDF
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Generating PDF…
+              </>
+            ) : (
+              <>
+                <FileText className="w-5 h-5" />
+                Generate Invoice PDF
+              </>
+            )}
           </button>
         </div>
 
